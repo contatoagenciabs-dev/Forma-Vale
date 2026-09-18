@@ -454,9 +454,16 @@ Responda ESTRITAMENTE em formato JSON válido com a seguinte estrutura sem marca
     return results;
   }
 
-  // 7. List subdata folder contents with full URLs and metadata
+  const ADMIN_PASSWORD = "Liberdade26";
+
+  // 7. List subdata folder contents with full URLs and metadata (Protected)
   app.get("/api/subdata/listar", (req, res) => {
     try {
+      const providedPass = req.query.senha || req.query.pass || req.headers["x-admin-password"];
+      if (providedPass !== ADMIN_PASSWORD) {
+        return res.status(401).json({ error: "Senha de administrador incorreta ou ausente." });
+      }
+
       const subdataRoot = getSubdataDir();
       if (!fs.existsSync(subdataRoot)) {
         return res.json({ items: [] });
@@ -508,8 +515,51 @@ Responda ESTRITAMENTE em formato JSON válido com a seguinte estrutura sem marca
     }
   });
 
-  // 8. Dedicated Web Page to browse Subdata Online directly from any browser
-  app.get("/subdata-online", (req, res) => {
+  // 8. Dedicated Web Page to browse Subdata Online directly with password authentication
+  app.all("/subdata-online", (req, res) => {
+    const providedPass = req.query.senha || req.query.pass || req.body?.senha || req.body?.pass;
+    const isAuthenticated = providedPass === ADMIN_PASSWORD;
+
+    if (!isAuthenticated) {
+      const authError = providedPass ? "<p style='color:#ef4444; font-weight:600; margin-top:12px; font-size:14px;'>❌ Senha incorreta. Tente novamente.</p>" : "";
+      return res.send(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Acesso Restrito · SubData Forma Vale</title>
+      <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 16px; }
+        .card { background: #1e293b; border: 1px solid #334155; padding: 36px; border-radius: 20px; max-width: 420px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.4); text-align: center; }
+        .icon { font-size: 48px; margin-bottom: 16px; display: block; }
+        h1 { font-size: 22px; font-weight: 700; margin: 0 0 8px 0; color: #f1f5f9; }
+        p { font-size: 14px; color: #94a3b8; margin: 0 0 24px 0; line-height: 1.5; }
+        input[type="password"] { width: 100%; box-sizing: border-box; padding: 14px 16px; border-radius: 10px; border: 1px solid #475569; background: #0f172a; color: white; font-size: 16px; margin-bottom: 16px; outline: none; transition: border-color 0.2s; }
+        input[type="password"]:focus { border-color: #0d9488; }
+        button { width: 100%; padding: 14px; border-radius: 10px; border: none; background: #0d9488; color: white; font-weight: 700; font-size: 15px; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #0f766e; }
+        .back-link { display: inline-block; margin-top: 20px; color: #64748b; text-decoration: none; font-size: 13px; }
+        .back-link:hover { color: #94a3b8; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <span class="icon">🔐</span>
+        <h1>Área Restrita do ADM</h1>
+        <p>Informe a senha de administrador para ter acesso aos arquivos e documentos SubData.</p>
+        <form method="GET" action="/subdata-online">
+          <input type="password" name="senha" placeholder="Digite a senha de ADM" required autofocus />
+          <button type="submit">Acessar Documentos SubData</button>
+        </form>
+        ${authError}
+        <a href="/" class="back-link">⬅ Voltar ao site principal</a>
+      </div>
+    </body>
+    </html>
+      `);
+    }
+
     const subdataRoot = getSubdataDir();
     const protocolFolders = getAllProtocolFolders(subdataRoot);
 
@@ -522,7 +572,7 @@ Responda ESTRITAMENTE em formato JSON válido com a seguinte estrutura sem marca
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Forma Vale · Drive Subdata Online</title>
+      <title>Forma Vale · Drive Subdata Protegido</title>
       <style>
         body { font-family: system-ui, -apple-system, sans-serif; background: #f4f7f8; color: #101820; margin: 0; padding: 24px; }
         .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 16px; border: 1px solid #dae2e8; padding: 28px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); }
@@ -537,14 +587,16 @@ Responda ESTRITAMENTE em formato JSON válido com a seguinte estrutura sem marca
         .file-btn:hover { background: #0f4c5c; color: white; }
         .empty { text-align: center; padding: 40px; color: #61707d; font-size: 15px; }
         .btn-home { background: #0f4c5c; color: white; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; }
+        .auth-badge { background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; display: inline-block; margin-top: 4px; }
       </style>
     </head>
     <body>
       <div class="container">
         <div class="header">
           <div>
-            <h1 class="title">📁 Drive Online · Documentos Subdata</h1>
+            <h1 class="title">📁 Drive Subdata Protegido (ADM)</h1>
             <p style="margin: 4px 0 0 0; color: #61707d; font-size: 13px;">Repositório online de solicitações, PDFs de contratos e comprovantes</p>
+            <span class="auth-badge">🔒 Acesso Autorizado (Administrador)</span>
           </div>
           <a href="/" class="btn-home">⬅ Voltar para o App</a>
         </div>

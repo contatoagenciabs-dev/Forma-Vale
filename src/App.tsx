@@ -60,6 +60,40 @@ export default function App() {
   const [lastProtocol, setLastProtocol] = useState<string | null>(null);
   const [lastPdfBlob, setLastPdfBlob] = useState<Blob | null>(null);
 
+  // Admin & Subdata Modal State
+  const [showAdminAuthModal, setShowAdminAuthModal] = useState<boolean>(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState<string>('');
+  const [adminAuthError, setAdminAuthError] = useState<string>('');
+  const [showSubdataModal, setShowSubdataModal] = useState<boolean>(false);
+  const [subdataList, setSubdataList] = useState<Array<{ protocol: string; folder: string; requestInfo: any; files: any[] }>>([]);
+
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPasswordInput === 'Liberdade26') {
+      setShowAdminAuthModal(false);
+      setAdminPasswordInput('');
+      setAdminAuthError('');
+      setShowSubdataModal(true);
+      fetchSubdataList();
+    } else {
+      setAdminAuthError('Senha de administrador incorreta. Tente novamente.');
+    }
+  };
+
+  const fetchSubdataList = async () => {
+    try {
+      const res = await fetch('/api/subdata/listar?senha=Liberdade26');
+      const data = await res.json();
+      if (res.ok) {
+        setSubdataList(data.items || []);
+      } else {
+        console.warn('Erro ao carregar subdata:', data.error);
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar subdata:', err);
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageRef = useRef<HTMLDivElement>(null);
 
@@ -437,6 +471,17 @@ export default function App() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="subdata-btn-top cursor-pointer"
+            onClick={() => {
+              setAdminAuthError('');
+              setAdminPasswordInput('');
+              setShowAdminAuthModal(true);
+            }}
+          >
+            🔐 Área ADM / SubData
+          </button>
           <div className="privacy">Documentos protegidos</div>
         </div>
       </header>
@@ -764,11 +809,178 @@ export default function App() {
       </section>
 
       {/* Footer */}
-
-      {/* Footer */}
-      <footer className="footer">
-        O comprovante registra a solicitação declarada e não confirma, por si só, a entrega ou validação do contrato.
+      <footer className="footer flex justify-between items-center flex-wrap gap-2">
+        <span>O comprovante registra a solicitação declarada e não confirma, por si só, a entrega ou validação do contrato.</span>
+        <button
+          type="button"
+          className="text-xs text-slate-400 hover:text-slate-600 underline cursor-pointer"
+          onClick={() => {
+            setAdminAuthError('');
+            setAdminPasswordInput('');
+            setShowAdminAuthModal(true);
+          }}
+        >
+          🔐 Área do Administrador (SubData)
+        </button>
       </footer>
+
+      {/* Admin Password Authentication Modal */}
+      {showAdminAuthModal && (
+        <div className="subdata-modal-backdrop" onClick={() => setShowAdminAuthModal(false)}>
+          <div className="subdata-modal-card max-w-md p-6 bg-slate-900 text-white rounded-2xl border border-slate-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
+              <strong className="text-lg flex items-center gap-2">
+                🔐 Área Restrita do ADM
+              </strong>
+              <button
+                type="button"
+                className="text-slate-400 hover:text-white font-bold text-xl px-2"
+                onClick={() => setShowAdminAuthModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-slate-300 mb-4">
+              Informe a senha de administrador para acessar os documentos e pastas gravados no servidor.
+            </p>
+            <form onSubmit={handleAdminLogin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Senha de Acesso (ADM)</label>
+                <input
+                  type="password"
+                  value={adminPasswordInput}
+                  onChange={(e) => setAdminPasswordInput(e.target.value)}
+                  placeholder="Digite a senha..."
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 text-sm"
+                  autoFocus
+                  required
+                />
+              </div>
+              {adminAuthError && (
+                <div className="text-xs text-red-400 font-semibold bg-red-950/50 p-2.5 rounded-lg border border-red-800">
+                  {adminAuthError}
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                  onClick={() => setShowAdminAuthModal(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-teal-600 text-white hover:bg-teal-500 transition-colors shadow-md"
+                >
+                  Acessar Documentos
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Subdata Explorer Modal */}
+      {showSubdataModal && (
+        <div className="subdata-modal-backdrop" onClick={() => setShowSubdataModal(false)}>
+          <div className="subdata-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="subdata-modal-header">
+              <div>
+                <strong className="text-lg">📁 Repositório de Documentos SubData (ADM)</strong>
+                <p className="text-xs opacity-80 font-normal">Pastas de solicitações, PDFs e JSONs gravados no servidor</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSubdataModal(false)}
+                className="text-white hover:opacity-75 font-bold text-xl px-2"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="subdata-modal-body">
+              <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-emerald-900 block">Página Web Protegida Online:</span>
+                  <span className="text-xs text-emerald-700">Acesse em qualquer navegador via /subdata-online</span>
+                </div>
+                <a
+                  href="/subdata-online?senha=Liberdade26"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-md hover:bg-emerald-800 transition-colors"
+                >
+                  🌐 Abrir SubData Online
+                </a>
+              </div>
+
+              {subdataList.length === 0 ? (
+                <div className="text-center py-10 text-slate-500 text-sm">
+                  <p className="font-semibold text-slate-700">Nenhum arquivo gravado na pasta subdata/documentos ainda.</p>
+                  <p className="text-xs mt-1">Envie uma solicitação no formulário para gerar os primeiros arquivos.</p>
+                </div>
+              ) : (
+                subdataList.map((item) => (
+                  <div key={item.protocol} className="subdata-folder-item">
+                    <div className="flex items-center justify-between mb-2">
+                      <strong className="text-sm text-slate-800 flex items-center gap-1.5">
+                        📂 Protocolo: {item.protocol}
+                      </strong>
+                      <span className="text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-medium">
+                        {item.files.length} arquivo(s)
+                      </span>
+                    </div>
+
+                    {item.requestInfo && (
+                      <div className="text-xs bg-white p-2.5 rounded-lg border border-slate-200 mb-2 space-y-1 text-slate-700">
+                        <div><b>Cliente:</b> {item.requestInfo.full_name} ({item.requestInfo.email})</div>
+                        <div><b>Curso/Turma:</b> {item.requestInfo.course_class} · {item.requestInfo.institution}</div>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {item.files.map((fileObj: any, fIdx: number) => {
+                        const fileName = typeof fileObj === 'string' ? fileObj : fileObj.name;
+                        const fileUrl = typeof fileObj === 'string' ? `/${item.folder}/${fileObj}` : (fileObj.url || `/${fileObj.path}`);
+                        return (
+                          <a
+                            key={fileName || fIdx}
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="subdata-file-link"
+                          >
+                            🔗 {fileName}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-100 border-t border-slate-200 flex justify-between items-center">
+              <a
+                href="/subdata-online?senha=Liberdade26"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-semibold text-teal-800 hover:underline"
+              >
+                🌐 Abrir Drive Subdata Online em Nova Guia
+              </a>
+              <button
+                type="button"
+                className="btn btn-secondary text-xs"
+                onClick={() => setShowSubdataModal(false)}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
