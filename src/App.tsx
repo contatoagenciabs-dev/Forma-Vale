@@ -94,6 +94,28 @@ export default function App() {
     }
   };
 
+  const handleClearSubdata = async () => {
+    if (!window.confirm(`⚠️ ATENÇÃO: Tem certeza de que deseja apagar TODOS os ${subdataList.length} registro(s) e arquivos salvos da pasta SubData no servidor? Esta ação é irreversível!`)) {
+      return;
+    }
+    try {
+      const res = await fetch('/api/subdata/limpar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senha: 'Liberdade26' }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSubdataList([]);
+        alert('Pasta SubData limpa com sucesso!');
+      } else {
+        alert(data.error || 'Erro ao limpar pasta SubData.');
+      }
+    } catch (err) {
+      alert('Erro ao conectar ao servidor para limpar pasta SubData.');
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageRef = useRef<HTMLDivElement>(null);
 
@@ -900,19 +922,30 @@ export default function App() {
             </div>
 
             <div className="subdata-modal-body">
-              <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+              <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  <span className="text-xs font-bold text-emerald-900 block">Página Web Protegida Online:</span>
-                  <span className="text-xs text-emerald-700">Acesse em qualquer navegador via /subdata-online</span>
+                  <span className="text-xs font-bold text-slate-800 block">Status da Pasta: {subdataList.length > 0 ? `${subdataList.length} pasta(s) com arquivos` : 'Pasta Vazia'}</span>
+                  <span className="text-xs text-slate-500">Documentos gravados em /subdata/documentos/</span>
                 </div>
-                <a
-                  href="/subdata-online?senha=Liberdade26"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-md hover:bg-emerald-800 transition-colors"
-                >
-                  🌐 Abrir SubData Online
-                </a>
+                <div className="flex items-center gap-2">
+                  {subdataList.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearSubdata}
+                      className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
+                    >
+                      🗑️ Limpar Pasta ({subdataList.length})
+                    </button>
+                  )}
+                  <a
+                    href="/subdata-online?senha=Liberdade26"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-teal-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-teal-800 transition-colors"
+                  >
+                    🌐 SubData Online
+                  </a>
+                </div>
               </div>
 
               {subdataList.length === 0 ? (

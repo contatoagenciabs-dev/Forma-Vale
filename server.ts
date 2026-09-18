@@ -587,6 +587,8 @@ Responda ESTRITAMENTE em formato JSON válido com a seguinte estrutura sem marca
         .file-btn:hover { background: #0f4c5c; color: white; }
         .empty { text-align: center; padding: 40px; color: #61707d; font-size: 15px; }
         .btn-home { background: #0f4c5c; color: white; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; }
+        .btn-clear { background: #dc2626; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: background 0.2s; }
+        .btn-clear:hover { background: #b91c1c; }
         .auth-badge { background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; display: inline-block; margin-top: 4px; }
       </style>
     </head>
@@ -598,7 +600,15 @@ Responda ESTRITAMENTE em formato JSON válido com a seguinte estrutura sem marca
             <p style="margin: 4px 0 0 0; color: #61707d; font-size: 13px;">Repositório online de solicitações, PDFs de contratos e comprovantes</p>
             <span class="auth-badge">🔒 Acesso Autorizado (Administrador)</span>
           </div>
-          <a href="/" class="btn-home">⬅ Voltar para o App</a>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            ${protocolFolders.length > 0 ? `
+              <form method="POST" action="/subdata-online/limpar" onsubmit="return confirm('⚠️ ATENÇÃO: Deseja apagar TODOS os arquivos e pastas gravados na pasta SubData? Esta ação é irreversível!');">
+                <input type="hidden" name="senha" value="${providedPass}" />
+                <button type="submit" class="btn-clear">🗑️ Limpar Pasta SubData</button>
+              </form>
+            ` : ""}
+            <a href="/" class="btn-home">⬅ Voltar ao App</a>
+          </div>
         </div>
     `;
 
@@ -642,6 +652,42 @@ Responda ESTRITAMENTE em formato JSON válido com a seguinte estrutura sem marca
     `;
 
     res.send(htmlContent);
+  });
+
+  // 9. API endpoint to clear subdata folder when full (Protected with Liberdade26)
+  app.post("/api/subdata/limpar", (req, res) => {
+    try {
+      const providedPass = req.body?.senha || req.query?.senha || req.headers["x-admin-password"];
+      if (providedPass !== ADMIN_PASSWORD) {
+        return res.status(401).json({ error: "Senha de administrador incorreta ou ausente." });
+      }
+
+      const subdataRoot = getSubdataDir();
+      if (fs.existsSync(subdataRoot)) {
+        fs.rmSync(subdataRoot, { recursive: true, force: true });
+        fs.mkdirSync(path.join(subdataRoot, "documentos"), { recursive: true });
+      }
+
+      console.log("[subdata] Pasta subdata limpa com sucesso pelo administrador.");
+      return res.json({ success: true, message: "Todos os arquivos e pastas da pasta SubData foram apagados com sucesso." });
+    } catch (err: any) {
+      console.error("Erro ao limpar pasta subdata:", err);
+      return res.status(500).json({ error: err.message || "Erro interno ao limpar subdata." });
+    }
+  });
+
+  // 10. Web route action to clear SubData online from web browser
+  app.post("/subdata-online/limpar", (req, res) => {
+    const providedPass = req.body?.senha || req.query?.senha;
+    if (providedPass === ADMIN_PASSWORD) {
+      const subdataRoot = getSubdataDir();
+      if (fs.existsSync(subdataRoot)) {
+        fs.rmSync(subdataRoot, { recursive: true, force: true });
+        fs.mkdirSync(path.join(subdataRoot, "documentos"), { recursive: true });
+      }
+      console.log("[subdata-online] Pasta subdata limpa via interface online.");
+    }
+    return res.redirect(`/subdata-online?senha=${encodeURIComponent(providedPass || "")}`);
   });
 
 async function setupServer() {
