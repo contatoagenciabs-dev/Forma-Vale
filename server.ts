@@ -6,19 +6,32 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+export const app = express();
+const PORT = 3000;
 
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-  // Serve files from subdata folder statically if requested
-  const subdataDir = path.join(process.cwd(), "subdata");
-  if (!fs.existsSync(subdataDir)) {
-    fs.mkdirSync(subdataDir, { recursive: true });
+// Helper to get writeable subdata directory (uses /tmp on Vercel)
+function getSubdataDir(): string {
+  if (process.env.VERCEL === "1") {
+    const tmpDir = path.join("/tmp", "subdata");
+    if (!fs.existsSync(tmpDir)) {
+      fs.mkdirSync(tmpDir, { recursive: true });
+    }
+    return tmpDir;
   }
-  app.use("/subdata", express.static(subdataDir));
+  const localDir = path.join(process.cwd(), "subdata");
+  if (!fs.existsSync(localDir)) {
+    fs.mkdirSync(localDir, { recursive: true });
+  }
+  return localDir;
+}
+
+// Serve files from subdata folder statically if requested
+app.use("/subdata", (req, res, next) => {
+  express.static(getSubdataDir())(req, res, next);
+});
 
   // Helper for Lazy Gemini AI initialization
   let aiClient: GoogleGenAI | null = null;
@@ -352,7 +365,7 @@ Responda ESTRITAMENTE em formato JSON válido com a seguinte estrutura sem marca
         return res.status(400).json({ error: "Protocolo é obrigatório." });
       }
 
-      const requestDir = path.join(process.cwd(), "subdata", protocol);
+      const requestDir = path.join(getSubdataDir(), protocol);
       if (!fs.existsSync(requestDir)) {
         fs.mkdirSync(requestDir, { recursive: true });
       }
@@ -408,7 +421,7 @@ Responda ESTRITAMENTE em formato JSON válido com a seguinte estrutura sem marca
   // 7. List subdata folder contents with full URLs and metadata
   app.get("/api/subdata/listar", (req, res) => {
     try {
-      const subdataRoot = path.join(process.cwd(), "subdata");
+      const subdataRoot = getSubdataDir();
       if (!fs.existsSync(subdataRoot)) {
         return res.json({ items: [] });
       }
@@ -465,7 +478,7 @@ Responda ESTRITAMENTE em formato JSON válido com a seguinte estrutura sem marca
 
   // 8. Dedicated Web Page to browse Subdata Online directly from any browser
   app.get("/subdata-online", (req, res) => {
-    const subdataRoot = path.join(process.cwd(), "subdata");
+    const subdataRoot = getSubdataDir();
     let folders: string[] = [];
     if (fs.existsSync(subdataRoot)) {
       folders = fs.readdirSync(subdataRoot);
@@ -552,15 +565,16 @@ Responda ESTRITAMENTE em formato JSON válido com a seguinte estrutura sem marca
     res.send(htmlContent);
   });
 
+async function setupServer() {
   // Vite middleware for development / static server for production
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa"
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.VERCEL) {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (_req, res) => {
@@ -568,9 +582,13 @@ Responda ESTRITAMENTE em formato JSON válido com a seguinte estrutura sem marca
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Forma Vale] Server running on http://0.0.0.0:${PORT}`);
-  });
+  if (process.env.VERCEL !== "1" && !process.env.VERCEL_ENV) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`[Forma Vale] Server running on http://0.0.0.0:${PORT}`);
+    });
+  }
 }
 
-startServer();
+setupServer();
+
+export default app;
